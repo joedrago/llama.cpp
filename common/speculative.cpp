@@ -2564,6 +2564,17 @@ common_params common_base_params_to_speculative(const common_params & params) {
     // the MoE cache is only used by the target context
     result.moe_cache_size = 0;
 
+    // local patch: the MTP draft only catches up on target batches, so a small ubatch
+    // shrinks its compute buffers without changing what it drafts
+    if (const char * ub = getenv("LLAMA_SPEC_DRAFT_UBATCH")) {
+        const bool has_mtp = std::find(params.speculative.types.begin(), params.speculative.types.end(),
+                COMMON_SPECULATIVE_TYPE_DRAFT_MTP) != params.speculative.types.end();
+        const int n_ub = atoi(ub);
+        if (has_mtp && n_ub > 0) {
+            result.n_ubatch = std::min<int32_t>(result.n_ubatch, n_ub);
+        }
+    }
+
     // dflash/dspark decode the whole noise block in a single pass and sample every block position on the backend
     // TODO: refactor such properties to be announced by the speculative types
     //       something like `struct common_speculative_type_props common_speculative_type_get_props(...);`
